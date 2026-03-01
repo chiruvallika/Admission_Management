@@ -1,0 +1,165 @@
+Assessment
+Deadline: Please submit within 3 Days
+Format: Working Code, Git
+AI tools: Allowed, but disclose tool used and what was AI-assisted.
+Note- If you are shortlisted for the next round, you will be required to explain your submitted
+code during the interview, including your approach, logic, and any AI assistance used.
+Admission Management & CRM
+Simple BRS (Minimal Version)
+1. Objective
+Build a web-based Admission Management system that allows colleges to:
+● Configure programs and quotas
+● Manage applicants
+● Allocate seats without quota violations
+● Generate admission numbers
+● Track documents and fees
+● View basic dashboards
+System must ensure:
+● No seat overbooking
+● Quota-wise control
+● Simple admission workflow
+2. Scope (Build Only These)
+2.1 Master Setup
+Admin should be able to create:
+● Institution
+● Campus
+● Department
+● Program / Branch
+● Academic Year
+● Course Type: UG / PG
+● Entry Type: Regular / Lateral
+● Admission Mode: Government / Management
+2.2 Seat Matrix & Quota
+For each program:
+● Total intake (e.g., 100)
+● Quotas:
+○ KCET
+○ COMEDK
+○ Management
+● System rules:
+○ Total base quota must = intake
+○ Real-time seat counter per quota
+○ Block allocation if quota full
+● Optional:
+○ Supernumerary seats (separate counter)
+● Institution-level cap (example):
+○ J&K total limit across programs
+2.3 Applicant Management
+Create applicant:
+● Basic details (Not more than 15 Fields in Application Form)
+● Category (GM/SC/ST etc.)
+● Entry type
+● Quota type
+● Marks / qualifying exam
+Document checklist status:
+● Pending / Submitted / Verified
+2.4 Admission Allocation
+Government Flow
+● Enter allotment number
+● Select quota (KCET/COMEDK)
+● System checks availability
+● Seat locked
+Management Flow
+● Create applicant manually
+● Select program & quota
+● Allocate if available
+2.5 Admission Confirmation
+On confirmation:
+● Generate Admission Number
+Format example:
+INST/2026/UG/CSE/KCET/0001
+Admission number is:
+● Unique
+● Immutable
+2.6 Fee Status (Simple)
+Fields:
+● Pending
+● Paid
+Seat confirmed only when:
+● Fee = Paid
+2.7 Dashboards (Basic)
+Show:
+● Total intake vs admitted
+● Quota-wise filled seats
+● Remaining seats
+● Applicants with pending documents
+● Fee pending list
+3. User Roles
+Admin
+● Setup masters
+● Configure quotas
+Admission Officer
+● Create applicants
+● Allocate seats
+● Verify documents
+● Confirm admission
+Management (View Only)
+● View dashboard
+4. User Stories (Minimal)
+Setup
+● As an Admin, I want to create programs so admissions can be configured.
+● As an Admin, I want to define quota and intake so seat limits are enforced.
+Applicant
+● As an Admission Officer, I want to create an applicant so I can process admission.
+● As an Admission Officer, I want to upload/mark documents so verification is tracked.
+Seat Allocation
+● As an Admission Officer, I want the system to block seat allocation when quota is full
+so violations don’t happen.
+● As an Admission Officer, I want to see remaining seats before allocating.
+Admission Confirmation
+● As an Admission Officer, I want a system-generated admission number so the
+student can be officially admitted.
+● As an Admission Officer, I want admission to be confirmed only after fee is paid.
+Dashboard
+● As Management, I want to see seat filling status so I can track progress.
+5. User Journeys
+Journey 1: System Setup
+Admin →
+Create Institution → Campus → Department → Program → Intake → Quotas
+Journey 2: Government Admission
+Admission Officer →
+Create Applicant →
+Enter allotment details →
+Select quota →
+System checks availability →
+Seat locked →
+Documents verified →
+Fee marked Paid →
+Admission number generated
+Journey 3: Management Admission
+Admission Officer →
+Create Applicant →
+Select Program & Management quota →
+Check seat availability →
+Allocate seat →
+Verify documents →
+Fee Paid →
+Admission confirmed
+Journey 4: Monitoring
+Management →
+Login →
+View Dashboard →
+Check:
+● Filled seats
+● Remaining quota
+● Pending fees/documents
+6. Key System Rules (Must Implement)
+1. Quota seats cannot exceed intake
+2. No seat allocation if quota full
+3. Admission number generated only once
+4. Admission confirmed only if fee paid
+5. Seat counters update in real time
+7. Out of Scope (Do NOT Build)
+● Payment gateway
+● SMS/WhatsApp
+● Advanced CRM
+● AI prediction
+● Multi-college complexity
+● Marketing automation
+8. Expected Deliverable (for Candidate)
+A simple web app with:
+● Master setup
+● Applicant form
+● Seat allocation with quota validation
+● Admission confirmation
+● Basic dashboard

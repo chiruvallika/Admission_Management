@@ -1,118 +1,142 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, serial, timestamp, boolean } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  role: text("role").notNull().default("admission_officer"),
-});
+export interface User {
+  id: number;
+  username: string;
+  password: string;
+  role: string;
+}
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
+export const insertUserSchema = z.object({
+  username: z.string().min(1),
+  password: z.string().min(1),
+  role: z.string().default("admission_officer"),
+});
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
 
-export const institutions = pgTable("institutions", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  code: text("code").notNull().unique(),
+export interface Institution {
+  id: number;
+  name: string;
+  code: string;
+}
+
+export const insertInstitutionSchema = z.object({
+  name: z.string().min(1),
+  code: z.string().min(1),
 });
-
-export const insertInstitutionSchema = createInsertSchema(institutions).omit({ id: true });
 export type InsertInstitution = z.infer<typeof insertInstitutionSchema>;
-export type Institution = typeof institutions.$inferSelect;
 
-export const campuses = pgTable("campuses", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  institutionId: integer("institution_id").notNull(),
+export interface Campus {
+  id: number;
+  name: string;
+  institutionId: number;
+}
+
+export const insertCampusSchema = z.object({
+  name: z.string().min(1),
+  institutionId: z.number(),
 });
-
-export const insertCampusSchema = createInsertSchema(campuses).omit({ id: true });
 export type InsertCampus = z.infer<typeof insertCampusSchema>;
-export type Campus = typeof campuses.$inferSelect;
 
-export const departments = pgTable("departments", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  campusId: integer("campus_id").notNull(),
+export interface Department {
+  id: number;
+  name: string;
+  campusId: number;
+}
+
+export const insertDepartmentSchema = z.object({
+  name: z.string().min(1),
+  campusId: z.number(),
 });
-
-export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true });
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
-export type Department = typeof departments.$inferSelect;
 
-export const academicYears = pgTable("academic_years", {
-  id: serial("id").primaryKey(),
-  year: text("year").notNull().unique(),
-  isCurrent: boolean("is_current").notNull().default(false),
+export interface AcademicYear {
+  id: number;
+  year: string;
+  isCurrent: boolean;
+}
+
+export const insertAcademicYearSchema = z.object({
+  year: z.string().min(1),
+  isCurrent: z.boolean().default(false),
 });
-
-export const insertAcademicYearSchema = createInsertSchema(academicYears).omit({ id: true });
 export type InsertAcademicYear = z.infer<typeof insertAcademicYearSchema>;
-export type AcademicYear = typeof academicYears.$inferSelect;
 
-export const programs = pgTable("programs", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  code: text("code").notNull(),
-  departmentId: integer("department_id").notNull(),
-  courseType: text("course_type").notNull(),
-  entryType: text("entry_type").notNull().default("Regular"),
-  totalIntake: integer("total_intake").notNull(),
+export interface Program {
+  id: number;
+  name: string;
+  code: string;
+  departmentId: number;
+  courseType: string;
+  entryType: string;
+  totalIntake: number;
+}
+
+export const insertProgramSchema = z.object({
+  name: z.string().min(1),
+  code: z.string().min(1),
+  departmentId: z.number(),
+  courseType: z.string().min(1),
+  entryType: z.string().default("Regular"),
+  totalIntake: z.number().min(1),
 });
-
-export const insertProgramSchema = createInsertSchema(programs).omit({ id: true });
 export type InsertProgram = z.infer<typeof insertProgramSchema>;
-export type Program = typeof programs.$inferSelect;
 
-export const quotas = pgTable("quotas", {
-  id: serial("id").primaryKey(),
-  programId: integer("program_id").notNull(),
-  quotaName: text("quota_name").notNull(),
-  totalSeats: integer("total_seats").notNull(),
-  filledSeats: integer("filled_seats").notNull().default(0),
-  isSupernumerary: boolean("is_supernumerary").notNull().default(false),
+export interface Quota {
+  id: number;
+  programId: number;
+  quotaName: string;
+  totalSeats: number;
+  filledSeats: number;
+  isSupernumerary: boolean;
+}
+
+export const insertQuotaSchema = z.object({
+  programId: z.number(),
+  quotaName: z.string().min(1),
+  totalSeats: z.number().min(1),
+  isSupernumerary: z.boolean().default(false),
 });
-
-export const insertQuotaSchema = createInsertSchema(quotas).omit({ id: true, filledSeats: true });
 export type InsertQuota = z.infer<typeof insertQuotaSchema>;
-export type Quota = typeof quotas.$inferSelect;
 
-export const applicants = pgTable("applicants", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull(),
-  phone: text("phone").notNull(),
-  dateOfBirth: text("date_of_birth").notNull(),
-  gender: text("gender").notNull(),
-  category: text("category").notNull(),
-  address: text("address").notNull(),
-  qualifyingExam: text("qualifying_exam").notNull(),
-  marks: integer("marks").notNull(),
-  entryType: text("entry_type").notNull().default("Regular"),
-  quotaType: text("quota_type").notNull(),
-  programId: integer("program_id").notNull(),
-  allotmentNumber: text("allotment_number"),
-  admissionMode: text("admission_mode").notNull(),
-  documentStatus: text("document_status").notNull().default("Pending"),
-  feeStatus: text("fee_status").notNull().default("Pending"),
-  admissionNumber: text("admission_number"),
-  seatAllocated: boolean("seat_allocated").notNull().default(false),
-  admissionConfirmed: boolean("admission_confirmed").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export interface Applicant {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  gender: string;
+  category: string;
+  address: string;
+  qualifyingExam: string;
+  marks: number;
+  entryType: string;
+  quotaType: string;
+  programId: number;
+  allotmentNumber: string | null;
+  admissionMode: string;
+  documentStatus: string;
+  feeStatus: string;
+  admissionNumber: string | null;
+  seatAllocated: boolean;
+  admissionConfirmed: boolean;
+  createdAt: string;
+}
 
-export const insertApplicantSchema = createInsertSchema(applicants).omit({
-  id: true,
-  documentStatus: true,
-  feeStatus: true,
-  admissionNumber: true,
-  seatAllocated: true,
-  admissionConfirmed: true,
-  createdAt: true,
+export const insertApplicantSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().min(1),
+  dateOfBirth: z.string().min(1),
+  gender: z.string().min(1),
+  category: z.string().min(1),
+  address: z.string().min(1),
+  qualifyingExam: z.string().min(1),
+  marks: z.number(),
+  entryType: z.string().default("Regular"),
+  quotaType: z.string().min(1),
+  programId: z.number(),
+  allotmentNumber: z.string().nullable().optional(),
+  admissionMode: z.string().min(1),
 });
 export type InsertApplicant = z.infer<typeof insertApplicantSchema>;
-export type Applicant = typeof applicants.$inferSelect;

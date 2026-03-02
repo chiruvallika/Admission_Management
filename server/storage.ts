@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import {
   type User, type InsertUser,
   type Institution, type InsertInstitution,
@@ -7,11 +9,71 @@ import {
   type Program, type InsertProgram,
   type Quota, type InsertQuota,
   type Applicant, type InsertApplicant,
-  users, institutions, campuses, departments,
-  academicYears, programs, quotas, applicants,
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+
+interface DatabaseData {
+  nextId: Record<string, number>;
+  users: User[];
+  institutions: Institution[];
+  campuses: Campus[];
+  departments: Department[];
+  academicYears: AcademicYear[];
+  programs: Program[];
+  quotas: Quota[];
+  applicants: Applicant[];
+}
+
+const DATA_FILE = path.resolve(process.cwd(), "data", "db.json");
+
+function getEmptyDb(): DatabaseData {
+  return {
+    nextId: {
+      users: 1,
+      institutions: 1,
+      campuses: 1,
+      departments: 1,
+      academicYears: 1,
+      programs: 1,
+      quotas: 1,
+      applicants: 1,
+    },
+    users: [],
+    institutions: [],
+    campuses: [],
+    departments: [],
+    academicYears: [],
+    programs: [],
+    quotas: [],
+    applicants: [],
+  };
+}
+
+function ensureDataDir() {
+  const dir = path.dirname(DATA_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function loadData(): DatabaseData {
+  ensureDataDir();
+  if (!fs.existsSync(DATA_FILE)) {
+    return getEmptyDb();
+  }
+  const raw = fs.readFileSync(DATA_FILE, "utf-8");
+  return JSON.parse(raw) as DatabaseData;
+}
+
+function saveData(data: DatabaseData): void {
+  ensureDataDir();
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+}
+
+function getNextId(data: DatabaseData, table: string): number {
+  const id = data.nextId[table] || 1;
+  data.nextId[table] = id + 1;
+  return id;
+}
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -42,7 +104,6 @@ export interface IStorage {
   getQuotasByProgram(programId: number): Promise<Quota[]>;
   createQuota(data: InsertQuota): Promise<Quota>;
   deleteQuota(id: number): Promise<void>;
-  incrementQuotaFilled(programId: number, quotaName: string): Promise<boolean>;
 
   getApplicants(): Promise<Applicant[]>;
   getApplicant(id: number): Promise<Applicant | undefined>;
@@ -53,215 +114,267 @@ export interface IStorage {
   confirmAdmission(id: number): Promise<Applicant>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class JsonStorage implements IStorage {
+  private data: DatabaseData;
+
+  constructor() {
+    this.data = loadData();
+  }
+
+  reload(): void {
+    this.data = loadData();
+  }
+
+  private save(): void {
+    saveData(this.data);
+  }
+
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return this.data.users.find((u) => u.id === id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    return this.data.users.find((u) => u.username === username);
   }
 
-  async createUser(data: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(data).returning();
+  async createUser(input: InsertUser): Promise<User> {
+    const user: User = { id: getNextId(this.data, "users"), ...input, role: input.role || "admission_officer" };
+    this.data.users.push(user);
+    this.save();
     return user;
   }
 
   async getInstitutions(): Promise<Institution[]> {
-    return db.select().from(institutions);
+    return this.data.institutions;
   }
 
-  async createInstitution(data: InsertInstitution): Promise<Institution> {
-    const [inst] = await db.insert(institutions).values(data).returning();
+  async createInstitution(input: InsertInstitution): Promise<Institution> {
+    const existing = this.data.institutions.find((i) => i.code === input.code);
+    if (existing) throw new Error(`Institution with code "${input.code}" already exists`);
+    const inst: Institution = { id: getNextId(this.data, "institutions"), ...input };
+    this.data.institutions.push(inst);
+    this.save();
     return inst;
   }
 
   async deleteInstitution(id: number): Promise<void> {
-    await db.delete(institutions).where(eq(institutions.id, id));
+    this.data.institutions = this.data.institutions.filter((i) => i.id !== id);
+    this.save();
   }
 
   async getCampuses(): Promise<Campus[]> {
-    return db.select().from(campuses);
+    return this.data.campuses;
   }
 
-  async createCampus(data: InsertCampus): Promise<Campus> {
-    const [campus] = await db.insert(campuses).values(data).returning();
+  async createCampus(input: InsertCampus): Promise<Campus> {
+    const campus: Campus = { id: getNextId(this.data, "campuses"), ...input };
+    this.data.campuses.push(campus);
+    this.save();
     return campus;
   }
 
   async deleteCampus(id: number): Promise<void> {
-    await db.delete(campuses).where(eq(campuses.id, id));
+    this.data.campuses = this.data.campuses.filter((c) => c.id !== id);
+    this.save();
   }
 
   async getDepartments(): Promise<Department[]> {
-    return db.select().from(departments);
+    return this.data.departments;
   }
 
-  async createDepartment(data: InsertDepartment): Promise<Department> {
-    const [dept] = await db.insert(departments).values(data).returning();
+  async createDepartment(input: InsertDepartment): Promise<Department> {
+    const dept: Department = { id: getNextId(this.data, "departments"), ...input };
+    this.data.departments.push(dept);
+    this.save();
     return dept;
   }
 
   async deleteDepartment(id: number): Promise<void> {
-    await db.delete(departments).where(eq(departments.id, id));
+    this.data.departments = this.data.departments.filter((d) => d.id !== id);
+    this.save();
   }
 
   async getAcademicYears(): Promise<AcademicYear[]> {
-    return db.select().from(academicYears);
+    return this.data.academicYears;
   }
 
-  async createAcademicYear(data: InsertAcademicYear): Promise<AcademicYear> {
-    if (data.isCurrent) {
-      await db.update(academicYears).set({ isCurrent: false });
+  async createAcademicYear(input: InsertAcademicYear): Promise<AcademicYear> {
+    const existing = this.data.academicYears.find((y) => y.year === input.year);
+    if (existing) throw new Error(`Academic year "${input.year}" already exists`);
+    if (input.isCurrent) {
+      this.data.academicYears.forEach((y) => (y.isCurrent = false));
     }
-    const [year] = await db.insert(academicYears).values(data).returning();
+    const year: AcademicYear = { id: getNextId(this.data, "academicYears"), year: input.year, isCurrent: input.isCurrent ?? false };
+    this.data.academicYears.push(year);
+    this.save();
     return year;
   }
 
   async deleteAcademicYear(id: number): Promise<void> {
-    await db.delete(academicYears).where(eq(academicYears.id, id));
+    this.data.academicYears = this.data.academicYears.filter((y) => y.id !== id);
+    this.save();
   }
 
   async getPrograms(): Promise<Program[]> {
-    return db.select().from(programs);
+    return this.data.programs;
   }
 
-  async createProgram(data: InsertProgram): Promise<Program> {
-    const [prog] = await db.insert(programs).values(data).returning();
+  async createProgram(input: InsertProgram): Promise<Program> {
+    const prog: Program = { id: getNextId(this.data, "programs"), ...input, entryType: input.entryType || "Regular" };
+    this.data.programs.push(prog);
+    this.save();
     return prog;
   }
 
   async deleteProgram(id: number): Promise<void> {
-    await db.delete(programs).where(eq(programs.id, id));
+    this.data.programs = this.data.programs.filter((p) => p.id !== id);
+    this.save();
   }
 
   async getQuotas(): Promise<Quota[]> {
-    return db.select().from(quotas);
+    return this.data.quotas;
   }
 
   async getQuotasByProgram(programId: number): Promise<Quota[]> {
-    return db.select().from(quotas).where(eq(quotas.programId, programId));
+    return this.data.quotas.filter((q) => q.programId === programId);
   }
 
-  async createQuota(data: InsertQuota): Promise<Quota> {
-    if (!data.isSupernumerary) {
-      const existingQuotas = await this.getQuotasByProgram(data.programId);
-      const prog = await db.select().from(programs).where(eq(programs.id, data.programId));
-      if (prog.length > 0) {
-        const baseTotal = existingQuotas
-          .filter((q) => !q.isSupernumerary)
+  async createQuota(input: InsertQuota): Promise<Quota> {
+    if (!input.isSupernumerary) {
+      const prog = this.data.programs.find((p) => p.id === input.programId);
+      if (prog) {
+        const existingBase = this.data.quotas
+          .filter((q) => q.programId === input.programId && !q.isSupernumerary)
           .reduce((s, q) => s + q.totalSeats, 0);
-        if (baseTotal + data.totalSeats > prog[0].totalIntake) {
+        if (existingBase + input.totalSeats > prog.totalIntake) {
           throw new Error(
-            `Total base quota (${baseTotal + data.totalSeats}) would exceed program intake (${prog[0].totalIntake})`
+            `Total base quota (${existingBase + input.totalSeats}) would exceed program intake (${prog.totalIntake})`
           );
         }
       }
     }
-    const [quota] = await db.insert(quotas).values({ ...data, filledSeats: 0 }).returning();
+    const quota: Quota = {
+      id: getNextId(this.data, "quotas"),
+      programId: input.programId,
+      quotaName: input.quotaName,
+      totalSeats: input.totalSeats,
+      filledSeats: 0,
+      isSupernumerary: input.isSupernumerary ?? false,
+    };
+    this.data.quotas.push(quota);
+    this.save();
     return quota;
   }
 
   async deleteQuota(id: number): Promise<void> {
-    await db.delete(quotas).where(eq(quotas.id, id));
-  }
-
-  async incrementQuotaFilled(programId: number, quotaName: string): Promise<boolean> {
-    const result = await db.execute(
-      sql`UPDATE quotas SET filled_seats = filled_seats + 1
-          WHERE program_id = ${programId} AND quota_name = ${quotaName}
-          AND filled_seats < total_seats`
-    );
-    return (result as any).rowCount > 0;
+    this.data.quotas = this.data.quotas.filter((q) => q.id !== id);
+    this.save();
   }
 
   async getApplicants(): Promise<Applicant[]> {
-    return db.select().from(applicants);
+    return this.data.applicants;
   }
 
   async getApplicant(id: number): Promise<Applicant | undefined> {
-    const [app] = await db.select().from(applicants).where(eq(applicants.id, id));
-    return app;
+    return this.data.applicants.find((a) => a.id === id);
   }
 
-  async createApplicant(data: InsertApplicant): Promise<Applicant> {
-    const [prog] = await db.select().from(programs).where(eq(programs.id, data.programId));
+  async createApplicant(input: InsertApplicant): Promise<Applicant> {
+    const prog = this.data.programs.find((p) => p.id === input.programId);
     if (!prog) throw new Error("Program not found");
 
-    const [quota] = await db
-      .select()
-      .from(quotas)
-      .where(and(eq(quotas.programId, data.programId), eq(quotas.quotaName, data.quotaType)));
-    if (!quota) throw new Error(`No ${data.quotaType} quota found for this program`);
+    const quota = this.data.quotas.find(
+      (q) => q.programId === input.programId && q.quotaName === input.quotaType
+    );
+    if (!quota) throw new Error(`No ${input.quotaType} quota found for this program`);
 
-    const [app] = await db.insert(applicants).values(data).returning();
-    return app;
+    const applicant: Applicant = {
+      id: getNextId(this.data, "applicants"),
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      dateOfBirth: input.dateOfBirth,
+      gender: input.gender,
+      category: input.category,
+      address: input.address,
+      qualifyingExam: input.qualifyingExam,
+      marks: input.marks,
+      entryType: input.entryType || "Regular",
+      quotaType: input.quotaType,
+      programId: input.programId,
+      allotmentNumber: input.allotmentNumber || null,
+      admissionMode: input.admissionMode,
+      documentStatus: "Pending",
+      feeStatus: "Pending",
+      admissionNumber: null,
+      seatAllocated: false,
+      admissionConfirmed: false,
+      createdAt: new Date().toISOString(),
+    };
+    this.data.applicants.push(applicant);
+    this.save();
+    return applicant;
   }
 
   async updateApplicantDocStatus(id: number, status: string): Promise<Applicant> {
-    const [app] = await db
-      .update(applicants)
-      .set({ documentStatus: status })
-      .where(eq(applicants.id, id))
-      .returning();
+    const app = this.data.applicants.find((a) => a.id === id);
+    if (!app) throw new Error("Applicant not found");
+    app.documentStatus = status;
+    this.save();
     return app;
   }
 
   async updateApplicantFeeStatus(id: number, status: string): Promise<Applicant> {
-    const [app] = await db
-      .update(applicants)
-      .set({ feeStatus: status })
-      .where(eq(applicants.id, id))
-      .returning();
+    const app = this.data.applicants.find((a) => a.id === id);
+    if (!app) throw new Error("Applicant not found");
+    app.feeStatus = status;
+    this.save();
     return app;
   }
 
   async allocateSeat(id: number): Promise<Applicant> {
-    const applicant = await this.getApplicant(id);
+    const applicant = this.data.applicants.find((a) => a.id === id);
     if (!applicant) throw new Error("Applicant not found");
     if (applicant.seatAllocated) throw new Error("Seat already allocated");
 
-    const success = await this.incrementQuotaFilled(applicant.programId, applicant.quotaType);
-    if (!success) throw new Error("No seats available in this quota. Allocation blocked.");
+    const quota = this.data.quotas.find(
+      (q) => q.programId === applicant.programId && q.quotaName === applicant.quotaType
+    );
+    if (!quota) throw new Error("Quota not found for this program");
+    if (quota.filledSeats >= quota.totalSeats) {
+      throw new Error("No seats available in this quota. Allocation blocked.");
+    }
 
-    const [updated] = await db
-      .update(applicants)
-      .set({ seatAllocated: true })
-      .where(eq(applicants.id, id))
-      .returning();
-    return updated;
+    quota.filledSeats += 1;
+    applicant.seatAllocated = true;
+    this.save();
+    return applicant;
   }
 
   async confirmAdmission(id: number): Promise<Applicant> {
-    const applicant = await this.getApplicant(id);
+    const applicant = this.data.applicants.find((a) => a.id === id);
     if (!applicant) throw new Error("Applicant not found");
     if (!applicant.seatAllocated) throw new Error("Seat must be allocated first");
     if (applicant.feeStatus !== "Paid") throw new Error("Fee must be paid before confirmation");
     if (applicant.admissionConfirmed) throw new Error("Admission already confirmed");
 
-    const prog = await db.select().from(programs).where(eq(programs.id, applicant.programId));
-    if (!prog.length) throw new Error("Program not found");
+    const prog = this.data.programs.find((p) => p.id === applicant.programId);
+    if (!prog) throw new Error("Program not found");
 
-    const allInstitutions = await db.select().from(institutions);
-    const instCode = allInstitutions.length > 0 ? allInstitutions[0].code : "INST";
+    const instCode = this.data.institutions.length > 0 ? this.data.institutions[0].code : "INST";
 
-    const existingAdmissions = await db
-      .select()
-      .from(applicants)
-      .where(and(eq(applicants.admissionConfirmed, true), eq(applicants.programId, applicant.programId)));
+    const existingCount = this.data.applicants.filter(
+      (a) => a.admissionConfirmed && a.programId === applicant.programId
+    ).length;
 
-    const seqNum = String(existingAdmissions.length + 1).padStart(4, "0");
-    const admissionNumber = `${instCode}/2026/${prog[0].courseType}/${prog[0].code}/${applicant.quotaType}/${seqNum}`;
+    const seqNum = String(existingCount + 1).padStart(4, "0");
+    const admissionNumber = `${instCode}/2026/${prog.courseType}/${prog.code}/${applicant.quotaType}/${seqNum}`;
 
-    const [updated] = await db
-      .update(applicants)
-      .set({ admissionConfirmed: true, admissionNumber })
-      .where(eq(applicants.id, id))
-      .returning();
-    return updated;
+    applicant.admissionConfirmed = true;
+    applicant.admissionNumber = admissionNumber;
+    this.save();
+    return applicant;
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new JsonStorage();
